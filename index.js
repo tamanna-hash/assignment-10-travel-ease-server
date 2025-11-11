@@ -81,7 +81,7 @@ async function run() {
                 result
             })
         })
-        app.get('/my-bookings', async (req, res) => {
+        app.get('/my-bookings',verifyToken, async (req, res) => {
             const email = req.query.email
             const result = await requestRideCollection.find({bookingBy:email}).toArray()
             res.send(result)
@@ -92,6 +92,20 @@ async function run() {
             
             res.send(result)
         })
+        // update
+
+        app.put('/update-vehicle/:id',async (req,res)=>{
+            const id = req.params.id;
+            const data = req.body;
+            const filter = {_id:new ObjectId(id)}
+            const update = {
+                $set:data
+            }
+            const result = await vehicleCollection.updateOne(filter,update)
+            
+            res.send(result)
+        })
+
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     }
