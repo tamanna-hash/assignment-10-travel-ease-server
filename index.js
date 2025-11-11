@@ -55,7 +55,14 @@ async function run() {
         const requestRideCollection = db.collection('requestRides')
         // find
         app.get('/all-vehicles', async (req, res) => {
-            const result = await vehicleCollection.find().toArray()
+            // const result = await vehicleCollection.find().toArray()
+            const sort = req.query.sort;
+            let cursor = vehicleCollection.find();
+
+            if (sort === 'asc') cursor = cursor.sort({ pricePerDay: 1 });
+            if (sort === 'desc') cursor = cursor.sort({ pricePerDay: -1 });
+
+            const result = await cursor.toArray();
             res.send(result)
         })
         // find one
@@ -72,39 +79,63 @@ async function run() {
             const result = await vehicleCollection.find({ userEmail: email }).toArray()
             res.send(result)
         })
-        app.post('/all-vehicles', async (req, res) => {
+        app.post('/all-vehicles', verifyToken, async (req, res) => {
             const data = req.body
-            console.log(data);
             const result = await vehicleCollection.insertOne(data)
-            res.send({
-                success: true,
-                result
-            })
+            res.send(result)
         })
-        app.get('/my-bookings',verifyToken, async (req, res) => {
+        app.get('/my-bookings', verifyToken, async (req, res) => {
             const email = req.query.email
-            const result = await requestRideCollection.find({bookingBy:email}).toArray()
+            const result = await requestRideCollection.find({ bookingBy: email }).toArray()
+            res.send(result)
+        })
+        // latest-6
+        app.get('/latest-vehicles', async (req, res) => {
+            const result = await vehicleCollection.find().sort({ createdAt: "desc" }).limit(6).toArray()
+            res.send(result)
+        })
+        app.get('/search', async (req, res) => {
+            const search_text = req.query.search;
+            let result;
+            if (!search_text || search_text.trim() === "") {
+                result = await vehicleCollection.find().toArray();
+            } else {
+                result = await vehicleCollection.find({
+                    vehicleName: { $regex: search_text, $options: 'i' }
+                }).toArray();
+            }
             res.send(result)
         })
         app.post('/my-bookings', async (req, res) => {
             const data = req.body;
             const result = await requestRideCollection.insertOne(data)
-            
+
             res.send(result)
         })
         // update
 
-        app.put('/update-vehicle/:id',async (req,res)=>{
+        app.put('/all-vehicles/:id', async (req, res) => {
             const id = req.params.id;
             const data = req.body;
-            const filter = {_id:new ObjectId(id)}
+            const filter = { _id: new ObjectId(id) }
             const update = {
-                $set:data
+                $set: data
             }
-            const result = await vehicleCollection.updateOne(filter,update)
-            
+            const result = await vehicleCollection.updateOne(filter, update)
+
             res.send(result)
         })
+        // delete
+
+        app.delete('/all-vehicles/:id', verifyToken, (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const result = vehicleCollection.deleteOne(filter)
+            res.send(result)
+        })
+
+
+
 
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
