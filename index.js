@@ -2,10 +2,20 @@ const express = require('express')
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require("dotenv").config()
+const admin = require("firebase-admin");
+
 const app = express()
 const port = process.env.PORT || 3000;
 app.use(cors())
 app.use(express.json())
+
+const serviceAccount = require("./serviceKey.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.dgujpdx.mongodb.net/?appName=Cluster0`;
 
@@ -18,23 +28,48 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyToken = async (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        res.status(401).send({
+            message: 'Unauthorized Access'
+        })
+    }
+    const token = authorization.split(" ")[1];
+
+    try {
+        await admin.auth().verifyIdToken(token)
+        next()
+    } catch (error) {
+        res.status(401).send({
+            message: 'Unauthorized Access'
+        })
+    }
+}
 async function run() {
     try {
         await client.connect();
 
         const db = client.db('vehicleDB')
         const vehicleCollection = db.collection('vehicles')
+        const requestRideCollection = db.collection('requestRides')
         // find
         app.get('/all-vehicles', async (req, res) => {
             const result = await vehicleCollection.find().toArray()
             res.send(result)
         })
         // find one
-        app.get('/all-vehicles/:id', async (req, res) => {
+        app.get('/all-vehicles/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const objectId = { _id: new ObjectId(id) }
             const result = await vehicleCollection.findOne(objectId)
 
+            res.send(result)
+        })
+        // find with email
+        app.get('/my-vehicles', verifyToken, async (req, res) => {
+            const email = req.query.email;
+            const result = await vehicleCollection.find({ userEmail: email }).toArray()
             res.send(result)
         })
         app.post('/all-vehicles', async (req, res) => {
@@ -45,6 +80,17 @@ async function run() {
                 success: true,
                 result
             })
+        })
+        app.get('/my-bookings', async (req, res) => {
+            const email = req.query.email
+            const result = await requestRideCollection.find({bookingBy:email}).toArray()
+            res.send(result)
+        })
+        app.post('/my-bookings', async (req, res) => {
+            const data = req.body;
+            const result = await requestRideCollection.insertOne(data)
+            
+            res.send(result)
         })
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
