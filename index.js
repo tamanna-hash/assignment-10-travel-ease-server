@@ -106,11 +106,13 @@ async function run() {
             const update = {
                 $inc: {
                     booked: 1
-                }
+                },
+            //     $set: {
+            //     availability:'Booked'
+            // }
             }
             const requestCounted = await vehicleCollection.updateOne(filter, update)
-            res.send(result)
-
+            res.send({result,requestCounted})
 
         })
         // latest-6
