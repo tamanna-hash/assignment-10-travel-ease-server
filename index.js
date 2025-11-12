@@ -89,9 +89,38 @@ async function run() {
             const result = await requestRideCollection.find({ bookingBy: email }).toArray()
             res.send(result)
         })
+        // booking-details
+        app.get('/all-bookings/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const objectId = { _id: new ObjectId(id) }
+            const result = await requestRideCollection.findOne(objectId)
+            res.send(result)
+        })
+        app.post('/my-bookings/:id', async (req, res) => {
+            const data = req.body;
+            const id = req.params.id
+            const result = await requestRideCollection.insertOne(data)
+
+            //booking counted 
+            const filter = { _id: new ObjectId(id) }
+            const update = {
+                $inc: {
+                    booked: 1
+                }
+            }
+            const requestCounted = await vehicleCollection.updateOne(filter, update)
+            res.send(result)
+
+
+        })
         // latest-6
         app.get('/latest-vehicles', async (req, res) => {
             const result = await vehicleCollection.find().sort({ createdAt: "desc" }).limit(6).toArray()
+            res.send(result)
+        })
+        // top rated vehicles
+        app.get('/top-vehicles', async (req, res) => {
+            const result = await vehicleCollection.find().sort({ rating: "desc" }).limit(3).toArray()
             res.send(result)
         })
         app.get('/search', async (req, res) => {
@@ -104,12 +133,6 @@ async function run() {
                     vehicleName: { $regex: search_text, $options: 'i' }
                 }).toArray();
             }
-            res.send(result)
-        })
-        app.post('/my-bookings', async (req, res) => {
-            const data = req.body;
-            const result = await requestRideCollection.insertOne(data)
-
             res.send(result)
         })
         // update
